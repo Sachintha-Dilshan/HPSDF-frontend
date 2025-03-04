@@ -1,0 +1,68 @@
+name: Build and Deploy HPSDF frontend to EC2
+
+on:
+  workflow_call:
+    inputs:
+      GITHUB_ENVIRONMENT:
+        type: string
+        description: 'Environment'
+        required: true
+        default: 'DEV'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.GITHUB_ENVIRONMENT }}
+    outputs:
+      image-tag: ${{ steps.build-step.outputs.image_tag }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build React project
+        run: npm run build
+
+      - name: Docker Hub Login
+        run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
+      - name: Build and Push Docker Image
+        id: build-step
+        run: |
+          APP_VERSION=$(jq -r .version package.json)
+          GIT_SHORT_SHA=$(echo "${{ github.sha }}" | cut -c 1-8)
+          IMAGE_VERSION="${APP_VERSION}-${GIT_SHORT_SHA}"
+          DOCKER_BUILDKIT=1 docker build . -t "sachinthadilshan/hpsdf-frontend:${IMAGE_VERSION}" \
+            --build-arg ENV="${{ inputs.GITHUB_ENVIRONMENT }}"
+          docker push "sachinthadilshan/hpsdf-frontend:${IMAGE_VERSION}"
+          echo "image_tag=${IMAGE_VERSION}" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.GITHUB_ENVIRONMENT }}
+    steps:
+      - name: Deploy Docker Compose to EC2
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          script: |
+            set -e
+            echo "Pulling the image sachinthadilshan/hpsdf-frontend:${{ needs.build.outputs.image-tag }} from Docker Hub..."
+            docker pull sachinthadilshan/hpsdf-frontend:${{ needs.build.outputs.image-tag }}
+            
+            echo "Updating docker-compose file with the new image tag..."
+            sed -i "s|image: sachinthadilshan/hpsdf-frontend:.*|image: sachinthadilshan/hpsdf-frontend:${{ needs.build.outputs.image-tag }}|g" docker-compose.yml
+            
+            echo "Restarting the containers with docker-compose..."
+            docker-compose down
+            docker-compose up -d

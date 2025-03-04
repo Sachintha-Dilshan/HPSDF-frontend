@@ -1,0 +1,20 @@
+name: CI [DEV] HPSDF frontend
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - labeled
+      - synchronize
+      - closed
+    branches:
+      - 'release'
+
+jobs:
+  Build:
+    if: ${{ github.event.pull_request.merged == true }}
+    uses: ./.github/workflows/build.yaml
+    with:
+      GITHUB_ENVIRONMENT: 'DEV'
+    secrets: inherit
