@@ -1,4 +1,4 @@
-name: CI [DEV] Product Info Service
+name: CI [DEV] HPSDF frontend
 
 on:
   pull_request:
@@ -12,12 +12,9 @@ on:
       - 'develop'
 
 jobs:
-
   Build:
     if: ${{ github.event.pull_request.merged == true }}
     uses: ./.github/workflows/build.yaml
     with:
       GITHUB_ENVIRONMENT: 'DEV'
     secrets: inherit
-    needs:
-      - Test
