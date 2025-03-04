@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.GITHUB_ENVIRONMENT }}
     steps:
-      - name: Deploy React App to EC2
+      - name: Deploy Docker Compose to EC2
         uses: appleboy/ssh-action@v0.1.8
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -59,12 +59,10 @@ jobs:
             set -e
             echo "Pulling the image sachinthadilshan/hpsdf-frontend:${{ needs.build.outputs.image-tag }} from Docker Hub..."
             docker pull sachinthadilshan/hpsdf-frontend:${{ needs.build.outputs.image-tag }}
-
-            echo "Stopping and removing any existing container..."
-            docker stop hpsdf-frontend-container || true
-            docker rm hpsdf-frontend-container || true
-
-            echo "Running the new container..."
-            docker run -d --name hpsdf-frontend-container -p 3000:80 sachinthadilshan/hpsdf-frontend:${{ needs.build.outputs.image-tag }}
-
-            echo "Deployment completed successfully."
+            
+            echo "Updating docker-compose file with the new image tag..."
+            sed -i "s|image: sachinthadilshan/hpsdf-frontend:.*|image: sachinthadilshan/hpsdf-frontend:${{ needs.build.outputs.image-tag }}|g" docker-compose.yml
+            
+            echo "Restarting the containers with docker-compose..."
+            docker-compose down
+            docker-compose up -d
