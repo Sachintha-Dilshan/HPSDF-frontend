@@ -1,0 +1,23 @@
+name: CI [DEV] Product Info Service
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - labeled
+      - synchronize
+      - closed
+    branches:
+      - 'develop'
+
+jobs:
+
+  Build:
+    if: ${{ github.event.pull_request.merged == true }}
+    uses: ./.github/workflows/build.yaml
+    with:
+      GITHUB_ENVIRONMENT: 'DEV'
+    secrets: inherit
+    needs:
+      - Test
