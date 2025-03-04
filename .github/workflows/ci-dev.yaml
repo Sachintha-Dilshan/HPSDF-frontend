@@ -9,7 +9,7 @@ on:
       - synchronize
       - closed
     branches:
-      - 'develop'
+      - 'release'
 
 jobs:
   Build:
